@@ -34,6 +34,7 @@ RUN apt-get update \
     jq \
     libasound2 \
     libatk1.0-0 \
+    libatk-bridge2.0-0 \
     libatspi2.0-0 \
     libdbus-1-3 \
     libgbm1 \

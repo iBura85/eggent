@@ -28,6 +28,7 @@ import {
   saveExternalSession,
 } from "@/lib/storage/external-session-store";
 import { getAllProjects } from "@/lib/storage/project-store";
+import { runWithTelegramChatAction } from "@/lib/telegram/chat-actions";
 
 const TELEGRAM_TEXT_LIMIT = 4096;
 const TELEGRAM_FILE_MAX_BYTES = 30 * 1024 * 1024;
@@ -635,89 +636,107 @@ export async function POST(req: NextRequest) {
       return Response.json({ ok: true, command });
     }
 
-    let incomingSavedFile:
-      | {
-          name: string;
-          path: string;
-          size: number;
+    const processIncomingMessage = async () => {
+      let incomingSavedFile:
+        | {
+            name: string;
+            path: string;
+            size: number;
+          }
+        | null = null;
+
+      const incomingFile = message ? extractIncomingFile(message, messageId) : null;
+      let externalContext: TelegramExternalChatContext | null = null;
+      if (incomingFile) {
+        externalContext = await ensureTelegramExternalChatContext({
+          sessionId,
+          defaultProjectId,
+        });
+        const fileBuffer = await downloadTelegramFile(botToken, incomingFile.fileId);
+        const saved = await saveChatFile(
+          externalContext.chatId,
+          fileBuffer,
+          incomingFile.fileName
+        );
+        incomingSavedFile = {
+          name: saved.name,
+          path: saved.path,
+          size: saved.size,
+        };
+      }
+
+      if (!incomingText) {
+        if (incomingSavedFile) {
+          await sendTelegramMessage(
+            botToken,
+            chatId,
+            `File "${incomingSavedFile.name}" saved to chat files.`,
+            messageId
+          );
+          return Response.json({
+            ok: true,
+            fileSaved: true,
+            file: incomingSavedFile,
+          });
         }
-      | null = null;
 
-    const incomingFile = message ? extractIncomingFile(message, messageId) : null;
-    let externalContext: TelegramExternalChatContext | null = null;
-    if (incomingFile) {
-      externalContext = await ensureTelegramExternalChatContext({
-        sessionId,
-        defaultProjectId,
-      });
-      const fileBuffer = await downloadTelegramFile(botToken, incomingFile.fileId);
-      const saved = await saveChatFile(
-        externalContext.chatId,
-        fileBuffer,
-        incomingFile.fileName
-      );
-      incomingSavedFile = {
-        name: saved.name,
-        path: saved.path,
-        size: saved.size,
-      };
-    }
-
-    if (!incomingText) {
-      if (incomingSavedFile) {
         await sendTelegramMessage(
           botToken,
           chatId,
-          `File "${incomingSavedFile.name}" saved to chat files.`,
+          "Only text messages and file uploads are supported right now.",
           messageId
         );
-        return Response.json({
-          ok: true,
-          fileSaved: true,
-          file: incomingSavedFile,
-        });
+        return Response.json({ ok: true, ignored: true, reason: "non_text" });
       }
 
-      await sendTelegramMessage(
+      try {
+        const result = await handleExternalMessage({
+          sessionId,
+          message: incomingSavedFile
+            ? `${incomingText}\n\nAttached file: ${incomingSavedFile.name}`
+            : incomingText,
+          projectId: externalContext?.projectId ?? defaultProjectId,
+          chatId: externalContext?.chatId,
+          currentPath: normalizeTelegramCurrentPath(externalContext?.currentPath),
+          runtimeData: {
+            telegram: {
+              botToken,
+              chatId,
+              replyToMessageId: messageId ?? null,
+            },
+          },
+        });
+
+        await sendTelegramMessage(botToken, chatId, result.reply, messageId);
+        return Response.json({ ok: true });
+      } catch (error) {
+        if (error instanceof ExternalMessageError) {
+          const errorMessage =
+            typeof error.payload.error === "string"
+              ? error.payload.error
+              : "Не удалось обработать сообщение.";
+          await sendTelegramMessage(botToken, chatId, `Ошибка: ${errorMessage}`, messageId);
+          return Response.json({ ok: true, handledError: true, status: error.status });
+        }
+        throw error;
+      }
+    };
+
+    if (!incomingText) {
+      return await processIncomingMessage();
+    }
+
+    return await runWithTelegramChatAction(
+      {
+        action: "typing",
         botToken,
         chatId,
-        "Only text messages and file uploads are supported right now.",
-        messageId
-      );
-      return Response.json({ ok: true, ignored: true, reason: "non_text" });
-    }
-
-    try {
-      const result = await handleExternalMessage({
-        sessionId,
-        message: incomingSavedFile
-          ? `${incomingText}\n\nAttached file: ${incomingSavedFile.name}`
-          : incomingText,
-        projectId: externalContext?.projectId ?? defaultProjectId,
-        chatId: externalContext?.chatId,
-        currentPath: normalizeTelegramCurrentPath(externalContext?.currentPath),
-        runtimeData: {
-          telegram: {
-            botToken,
-            chatId,
-            replyToMessageId: messageId ?? null,
-          },
+        onError: (error) => {
+          console.warn("Telegram typing indicator error:", error);
         },
-      });
-
-      await sendTelegramMessage(botToken, chatId, result.reply, messageId);
-      return Response.json({ ok: true });
-    } catch (error) {
-      if (error instanceof ExternalMessageError) {
-        const errorMessage =
-          typeof error.payload.error === "string"
-            ? error.payload.error
-            : "Не удалось обработать сообщение.";
-        await sendTelegramMessage(botToken, chatId, `Ошибка: ${errorMessage}`, messageId);
-        return Response.json({ ok: true, handledError: true, status: error.status });
-      }
-      throw error;
-    }
+      },
+      processIncomingMessage
+    );
   } catch (error) {
     if (
       botIdForRollback &&

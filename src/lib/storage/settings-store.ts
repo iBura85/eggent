@@ -48,6 +48,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
     enabled: false,
     provider: "none",
   },
+  speechToText: {
+    enabled: false,
+    provider: "deepgram",
+    model: "nova-3",
+    language: "",
+  },
   general: {
     darkMode: false,
     language: "en",

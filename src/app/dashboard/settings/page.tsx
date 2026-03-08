@@ -415,6 +415,80 @@ export default function SettingsPage() {
                   )}
                 </div>
               </section>
+
+              <section className="border rounded-xl p-5 bg-card space-y-4">
+                <h3 className="font-semibold text-lg">Speech-to-Text</h3>
+                <p className="text-sm text-muted-foreground">
+                  Configure audio transcription for channels like Telegram voice
+                  and audio messages.
+                </p>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="speech-to-text-enabled"
+                    checked={settings.speechToText.enabled}
+                    onChange={(e) =>
+                      updateSettings("speechToText.enabled", e.target.checked)
+                    }
+                    className="rounded"
+                  />
+                  <Label htmlFor="speech-to-text-enabled">
+                    Enable speech-to-text transcription
+                  </Label>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Provider</Label>
+                    <select
+                      value={settings.speechToText.provider}
+                      onChange={(e) =>
+                        updateSettings("speechToText.provider", e.target.value)
+                      }
+                      className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                    >
+                      <option value="none">Disabled</option>
+                      <option value="deepgram">Deepgram</option>
+                    </select>
+                  </div>
+                  {settings.speechToText.provider === "deepgram" && (
+                    <div className="space-y-2">
+                      <Label>Deepgram API Key</Label>
+                      <Input
+                        type="password"
+                        value={settings.speechToText.apiKey || ""}
+                        onChange={(e) =>
+                          updateSettings("speechToText.apiKey", e.target.value)
+                        }
+                        placeholder="dg_..."
+                      />
+                    </div>
+                  )}
+                </div>
+                {settings.speechToText.provider === "deepgram" && (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Model</Label>
+                      <Input
+                        value={settings.speechToText.model || ""}
+                        onChange={(e) =>
+                          updateSettings("speechToText.model", e.target.value)
+                        }
+                        placeholder="nova-3"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Language</Label>
+                      <Input
+                        value={settings.speechToText.language || ""}
+                        onChange={(e) =>
+                          updateSettings("speechToText.language", e.target.value)
+                        }
+                        placeholder="Auto-detect if empty"
+                      />
+                    </div>
+                  </div>
+                )}
+              </section>
             </div>
           </SidebarInset>
         </div>

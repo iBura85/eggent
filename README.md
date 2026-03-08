@@ -204,6 +204,7 @@ Main environment variables:
 | `GOOGLE_API_KEY` | No | Google provider |
 | `OPENROUTER_API_KEY` | No | OpenRouter provider |
 | `TAVILY_API_KEY` | No | Web search integration |
+| `DEEPGRAM_API_KEY` | No | Optional Deepgram Speech-to-Text fallback key |
 | `EXTERNAL_API_TOKEN` | No (auto-generated in setup scripts) | External message API auth token |
 | `TELEGRAM_BOT_TOKEN` | No | Telegram bot token |
 | `TELEGRAM_WEBHOOK_SECRET` | No (auto-generated in setup scripts) | Telegram webhook secret |

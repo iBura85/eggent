@@ -19,6 +19,7 @@ import {
   getTelegramIntegrationRuntimeConfig,
   normalizeTelegramUserId,
 } from "@/lib/storage/telegram-integration-store";
+import { getSettings } from "@/lib/storage/settings-store";
 import { saveChatFile } from "@/lib/storage/chat-files-store";
 import { createChat, getChat } from "@/lib/storage/chat-store";
 import {
@@ -28,6 +29,8 @@ import {
   saveExternalSession,
 } from "@/lib/storage/external-session-store";
 import { getAllProjects } from "@/lib/storage/project-store";
+import { transcribeAudioFile } from "@/lib/speech-to-text/service";
+import { SpeechToTextError } from "@/lib/speech-to-text/types";
 import { runWithTelegramChatAction } from "@/lib/telegram/chat-actions";
 
 const TELEGRAM_TEXT_LIMIT = 4096;
@@ -82,8 +85,11 @@ interface TelegramApiResponse {
 }
 
 interface TelegramIncomingFile {
+  kind: "document" | "photo" | "audio" | "video" | "voice";
   fileId: string;
   fileName: string;
+  mimeType?: string;
+  supportsTranscription: boolean;
 }
 
 interface TelegramExternalChatContext {
@@ -287,8 +293,14 @@ function extractIncomingFile(
           : undefined,
     });
     return {
+      kind: "document",
       fileId: documentFileId,
       fileName: withMessageIdPrefix(sanitizeFileName(docNameRaw || fallback), messageId),
+      mimeType:
+        typeof message.document?.mime_type === "string"
+          ? message.document.mime_type
+          : undefined,
+      supportsTranscription: false,
     };
   }
 
@@ -300,10 +312,13 @@ function extractIncomingFile(
     const fileId = typeof photo?.file_id === "string" ? photo.file_id.trim() : "";
     if (fileId) {
       return {
+        kind: "photo",
         fileId,
         fileName: sanitizeFileName(
           buildIncomingFileName({ base: "photo", messageId, mimeType: "image/jpeg" })
         ),
+        mimeType: "image/jpeg",
+        supportsTranscription: false,
       };
     }
   }
@@ -322,8 +337,14 @@ function extractIncomingFile(
           : undefined,
     });
     return {
+      kind: "audio",
       fileId: audioFileId,
       fileName: withMessageIdPrefix(sanitizeFileName(audioNameRaw || fallback), messageId),
+      mimeType:
+        typeof message.audio?.mime_type === "string"
+          ? message.audio.mime_type
+          : undefined,
+      supportsTranscription: true,
     };
   }
 
@@ -341,8 +362,14 @@ function extractIncomingFile(
           : undefined,
     });
     return {
+      kind: "video",
       fileId: videoFileId,
       fileName: withMessageIdPrefix(sanitizeFileName(videoNameRaw || fallback), messageId),
+      mimeType:
+        typeof message.video?.mime_type === "string"
+          ? message.video.mime_type
+          : undefined,
+      supportsTranscription: false,
     };
   }
 
@@ -350,6 +377,7 @@ function extractIncomingFile(
     typeof message.voice?.file_id === "string" ? message.voice.file_id.trim() : "";
   if (voiceFileId) {
     return {
+      kind: "voice",
       fileId: voiceFileId,
       fileName: sanitizeFileName(
         buildIncomingFileName({
@@ -361,6 +389,11 @@ function extractIncomingFile(
               : undefined,
         })
       ),
+      mimeType:
+        typeof message.voice?.mime_type === "string"
+          ? message.voice.mime_type
+          : undefined,
+      supportsTranscription: true,
     };
   }
 
@@ -420,6 +453,49 @@ function normalizeOutgoingText(text: string): string {
   if (!value) return "Пустой ответ от агента.";
   if (value.length <= TELEGRAM_TEXT_LIMIT) return value;
   return `${value.slice(0, TELEGRAM_TEXT_LIMIT - 1)}…`;
+}
+
+function buildAudioAgentMessage(params: {
+  caption: string;
+  transcript: string;
+}): string {
+  const transcript = params.transcript.trim();
+  const caption = params.caption.trim();
+  if (!caption) {
+    return transcript;
+  }
+
+  return [
+    `Комментарий пользователя: ${caption}`,
+    `Распознанный текст: ${transcript}`,
+  ].join("\n\n");
+}
+
+function compactTranscriptPreview(text: string, maxLength = 280): string {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+  return `${normalized.slice(0, maxLength - 1)}…`;
+}
+
+function buildAudioTelegramReply(params: {
+  transcript: string;
+  agentReply: string;
+}): string {
+  return [
+    `Распознал: ${compactTranscriptPreview(params.transcript)}`,
+    "",
+    params.agentReply.trim(),
+  ].join("\n");
+}
+
+function isSpeechToTextConfigError(error: SpeechToTextError): boolean {
+  return (
+    error.code === "disabled" ||
+    error.code === "provider_not_configured" ||
+    error.code === "unsupported_provider"
+  );
 }
 
 async function sendTelegramMessage(
@@ -545,6 +621,7 @@ export async function POST(req: NextRequest) {
     const caption =
       typeof message?.caption === "string" ? message.caption.trim() : "";
     const incomingText = text || caption;
+    const incomingFile = message ? extractIncomingFile(message, messageId) : null;
     const fromUserId = normalizeTelegramUserId(message?.from?.id);
 
     if (!fromUserId) {
@@ -637,6 +714,7 @@ export async function POST(req: NextRequest) {
     }
 
     const processIncomingMessage = async () => {
+      const isTranscribableAudio = Boolean(incomingFile?.supportsTranscription);
       let incomingSavedFile:
         | {
             name: string;
@@ -644,8 +722,7 @@ export async function POST(req: NextRequest) {
             size: number;
           }
         | null = null;
-
-      const incomingFile = message ? extractIncomingFile(message, messageId) : null;
+      let transcriptText = "";
       let externalContext: TelegramExternalChatContext | null = null;
       if (incomingFile) {
         externalContext = await ensureTelegramExternalChatContext({
@@ -665,7 +742,69 @@ export async function POST(req: NextRequest) {
         };
       }
 
-      if (!incomingText) {
+      if (isTranscribableAudio && incomingSavedFile) {
+        const settings = await getSettings();
+        try {
+          const transcript = await transcribeAudioFile(
+            {
+              filePath: incomingSavedFile.path,
+              fileName: incomingSavedFile.name,
+              mimeType: incomingFile?.mimeType,
+            },
+            settings.speechToText
+          );
+          transcriptText = transcript.text.trim();
+        } catch (error) {
+          if (error instanceof SpeechToTextError) {
+            if (isSpeechToTextConfigError(error)) {
+              console.warn(
+                `Telegram STT provider_not_configured (${error.code}) for ${incomingFile?.kind}:`,
+                error
+              );
+              await sendTelegramMessage(
+                botToken,
+                chatId,
+                "Голосовое сообщение сохранено, но распознавание речи не настроено. Включите Speech-to-Text в Settings или добавьте ключ провайдера.",
+                messageId
+              );
+              return Response.json({
+                ok: true,
+                transcriptionSkipped: true,
+                reason: error.code,
+                file: incomingSavedFile,
+              });
+            }
+
+            console.error(
+              `Telegram STT transcription_failed for ${incomingFile?.kind}:`,
+              error
+            );
+          } else {
+            console.error(
+              `Telegram STT transcription_failed for ${incomingFile?.kind}:`,
+              error
+            );
+          }
+
+          await sendTelegramMessage(
+            botToken,
+            chatId,
+            "Не удалось распознать голосовое сообщение, попробуйте ещё раз или отправьте текст.",
+            messageId
+          );
+          return Response.json({
+            ok: true,
+            transcriptionFailed: true,
+            reason:
+              error instanceof SpeechToTextError
+                ? error.code
+                : "transcription_failed",
+            file: incomingSavedFile,
+          });
+        }
+      }
+
+      if (!incomingText && !transcriptText) {
         if (incomingSavedFile) {
           await sendTelegramMessage(
             botToken,
@@ -690,11 +829,17 @@ export async function POST(req: NextRequest) {
       }
 
       try {
+        const agentMessage = transcriptText
+          ? buildAudioAgentMessage({
+              caption,
+              transcript: transcriptText,
+            })
+          : incomingSavedFile
+            ? `${incomingText}\n\nAttached file: ${incomingSavedFile.name}`
+            : incomingText;
         const result = await handleExternalMessage({
           sessionId,
-          message: incomingSavedFile
-            ? `${incomingText}\n\nAttached file: ${incomingSavedFile.name}`
-            : incomingText,
+          message: agentMessage,
           projectId: externalContext?.projectId ?? defaultProjectId,
           chatId: externalContext?.chatId,
           currentPath: normalizeTelegramCurrentPath(externalContext?.currentPath),
@@ -707,7 +852,17 @@ export async function POST(req: NextRequest) {
           },
         });
 
-        await sendTelegramMessage(botToken, chatId, result.reply, messageId);
+        await sendTelegramMessage(
+          botToken,
+          chatId,
+          transcriptText
+            ? buildAudioTelegramReply({
+                transcript: transcriptText,
+                agentReply: result.reply,
+              })
+            : result.reply,
+          messageId
+        );
         return Response.json({ ok: true });
       } catch (error) {
         if (error instanceof ExternalMessageError) {
@@ -722,7 +877,7 @@ export async function POST(req: NextRequest) {
       }
     };
 
-    if (!incomingText) {
+    if (!incomingText && !incomingFile?.supportsTranscription) {
       return await processIncomingMessage();
     }
 

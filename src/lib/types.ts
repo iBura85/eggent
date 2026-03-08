@@ -5,6 +5,7 @@
 // --- Settings ---
 
 export type ChatAuthMethod = "api_key" | "oauth";
+export type SpeechToTextProvider = "none" | "deepgram" | "openai";
 
 export interface ModelConfig {
   provider:
@@ -50,6 +51,13 @@ export interface AppSettings {
     provider: "searxng" | "tavily" | "none";
     apiKey?: string;
     baseUrl?: string;
+  };
+  speechToText: {
+    enabled: boolean;
+    provider: SpeechToTextProvider;
+    apiKey?: string;
+    model?: string;
+    language?: string;
   };
   general: {
     darkMode: boolean;

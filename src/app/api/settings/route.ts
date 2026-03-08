@@ -39,6 +39,9 @@ function maskSettingsKeys(settings: AppSettings): AppSettings {
   if (masked.search.apiKey) {
     masked.search.apiKey = maskKey(masked.search.apiKey);
   }
+  if (masked.speechToText.apiKey) {
+    masked.speechToText.apiKey = maskKey(masked.speechToText.apiKey);
+  }
   if (masked.auth.passwordHash) {
     masked.auth.passwordHash = maskKey(masked.auth.passwordHash);
   }
@@ -70,6 +73,12 @@ function restoreMaskedKeys(
     next.search = {
       ...(next.search || {}),
       apiKey: current.search.apiKey,
+    };
+  }
+  if (isMaskedKey(next.speechToText?.apiKey)) {
+    next.speechToText = {
+      ...(next.speechToText || {}),
+      apiKey: current.speechToText.apiKey,
     };
   }
   if (isMaskedKey(next.auth?.passwordHash)) {

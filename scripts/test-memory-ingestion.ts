@@ -21,6 +21,11 @@ const mockSettings: AppSettings = {
         chunkSize: 400,
     },
     search: { enabled: false, provider: "none" },
+    speechToText: {
+        enabled: false,
+        provider: "deepgram",
+        model: "nova-3",
+    },
     general: { darkMode: true, language: "en" },
     auth: {
         enabled: true,

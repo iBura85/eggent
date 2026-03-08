@@ -8,6 +8,7 @@ import {
   type ToolSet,
 } from "ai";
 import { createModel } from "@/lib/providers/llm-provider";
+import { runBlockingStreamText } from "@/lib/agent/codex-stream-text";
 import { buildSystemPrompt } from "@/lib/agent/prompts";
 import { getSettings } from "@/lib/storage/settings-store";
 import { getChat, saveChat } from "@/lib/storage/chat-store";
@@ -34,6 +35,10 @@ function resolveModelProviderOptions(provider: string) {
     };
   }
   return undefined;
+}
+
+function shouldUseCodexStreamCompat(provider: string): boolean {
+  return provider === "codex-cli";
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -712,6 +717,9 @@ export async function runAgent(options: {
 }) {
   const settings = await getSettings();
   const providerOptions = resolveModelProviderOptions(settings.chatModel.provider);
+  const useCodexStreamCompat = shouldUseCodexStreamCompat(
+    settings.chatModel.provider
+  );
   const model = createModel(settings.chatModel, {
     projectId: options.projectId,
     currentPath: options.currentPath,
@@ -805,24 +813,37 @@ export async function runAgent(options: {
 
       if (shouldAutoContinueAssistant(lastAssistantText, finishReason)) {
         try {
-          const continuation = await generateText({
-            model,
-            system: systemPrompt,
-            messages: [
-              ...messages,
-              ...responseMessages,
-              {
-                role: "user",
-                content:
-                  "Continue your previous answer from exactly where it stopped. " +
-                  "Output only the continuation text, without repeating earlier content.",
-              },
-            ],
-            providerOptions,
-            temperature: settings.chatModel.temperature ?? 0.7,
-            maxOutputTokens: Math.min(settings.chatModel.maxTokens ?? 4096, 1200),
-          });
-          continuationText = (continuation.text || "").trim();
+          const continuationMessages: ModelMessage[] = [
+            ...messages,
+            ...responseMessages,
+            {
+              role: "user",
+              content:
+                "Continue your previous answer from exactly where it stopped. " +
+                "Output only the continuation text, without repeating earlier content.",
+            },
+          ];
+          if (useCodexStreamCompat) {
+            const continuation = await runBlockingStreamText({
+              model,
+              system: systemPrompt,
+              messages: continuationMessages,
+              providerOptions,
+              temperature: settings.chatModel.temperature ?? 0.7,
+              maxOutputTokens: Math.min(settings.chatModel.maxTokens ?? 4096, 1200),
+            });
+            continuationText = continuation.text.trim();
+          } else {
+            const continuation = await generateText({
+              model,
+              system: systemPrompt,
+              messages: continuationMessages,
+              providerOptions,
+              temperature: settings.chatModel.temperature ?? 0.7,
+              maxOutputTokens: Math.min(settings.chatModel.maxTokens ?? 4096, 1200),
+            });
+            continuationText = (continuation.text || "").trim();
+          }
         } catch (error) {
           console.warn("Auto-continuation failed:", error);
         }
@@ -906,6 +927,9 @@ export async function runAgentText(options: {
 }): Promise<string> {
   const settings = await getSettings();
   const providerOptions = resolveModelProviderOptions(settings.chatModel.provider);
+  const useCodexStreamCompat = shouldUseCodexStreamCompat(
+    settings.chatModel.provider
+  );
   const model = createModel(settings.chatModel, {
     projectId: options.projectId,
     currentPath: options.currentPath,
@@ -965,26 +989,45 @@ export async function runAgentText(options: {
     toolNames,
     temperature: settings.chatModel.temperature,
     maxTokens: settings.chatModel.maxTokens,
-    label: "LLM Request (non-stream)",
+    label: useCodexStreamCompat
+      ? "LLM Request (non-stream via stream compat)"
+      : "LLM Request (non-stream)",
   });
 
   try {
-    const generated = await generateText({
-      model,
-      system: systemPrompt,
-      messages,
-      providerOptions,
-      tools,
-      stopWhen: [stepCountIs(MAX_TOOL_STEPS_PER_TURN), hasToolCall("response")],
-      temperature: settings.chatModel.temperature ?? 0.7,
-      maxOutputTokens: settings.chatModel.maxTokens ?? 4096,
-    });
+    let responseMessages: ModelMessage[] | undefined;
+    let text = "";
 
-    const responseMessages = (
-      generated as unknown as { response?: { messages?: ModelMessage[] } }
-    ).response?.messages;
+    if (useCodexStreamCompat) {
+      const generated = await runBlockingStreamText({
+        model,
+        system: systemPrompt,
+        messages,
+        providerOptions,
+        tools,
+        stopWhen: [stepCountIs(MAX_TOOL_STEPS_PER_TURN), hasToolCall("response")],
+        temperature: settings.chatModel.temperature ?? 0.7,
+        maxOutputTokens: settings.chatModel.maxTokens ?? 4096,
+      });
+      responseMessages = generated.responseMessages;
+      text = generated.text ?? "";
+    } else {
+      const generated = await generateText({
+        model,
+        system: systemPrompt,
+        messages,
+        providerOptions,
+        tools,
+        stopWhen: [stepCountIs(MAX_TOOL_STEPS_PER_TURN), hasToolCall("response")],
+        temperature: settings.chatModel.temperature ?? 0.7,
+        maxOutputTokens: settings.chatModel.maxTokens ?? 4096,
+      });
+      responseMessages = (
+        generated as unknown as { response?: { messages?: ModelMessage[] } }
+      ).response?.messages;
+      text = generated.text ?? "";
+    }
 
-    const text = generated.text ?? "";
     const fallbackReply =
       Array.isArray(responseMessages) && responseMessages.length > 0
         ? getLastResponseToolText(responseMessages) || getLastAssistantText(responseMessages)
@@ -1051,6 +1094,9 @@ export async function runSubordinateAgent(options: {
 }): Promise<string> {
   const settings = await getSettings();
   const providerOptions = resolveModelProviderOptions(settings.chatModel.provider);
+  const useCodexStreamCompat = shouldUseCodexStreamCompat(
+    settings.chatModel.provider
+  );
   const model = createModel(settings.chatModel, {
     projectId: options.projectId,
   });
@@ -1105,20 +1151,33 @@ export async function runSubordinateAgent(options: {
     toolNames,
     temperature: settings.chatModel.temperature,
     maxTokens: settings.chatModel.maxTokens,
-    label: "LLM Request (subordinate)",
+    label: useCodexStreamCompat
+      ? "LLM Request (subordinate via stream compat)"
+      : "LLM Request (subordinate)",
   });
 
   try {
-    const { text } = await generateText({
-      model,
-      system: systemPrompt,
-      messages,
-      providerOptions,
-      tools,
-      stopWhen: [stepCountIs(MAX_TOOL_STEPS_SUBORDINATE), hasToolCall("response")],
-      temperature: settings.chatModel.temperature ?? 0.7,
-      maxOutputTokens: settings.chatModel.maxTokens ?? 4096,
-    });
+    const { text } = useCodexStreamCompat
+      ? await runBlockingStreamText({
+          model,
+          system: systemPrompt,
+          messages,
+          providerOptions,
+          tools,
+          stopWhen: [stepCountIs(MAX_TOOL_STEPS_SUBORDINATE), hasToolCall("response")],
+          temperature: settings.chatModel.temperature ?? 0.7,
+          maxOutputTokens: settings.chatModel.maxTokens ?? 4096,
+        })
+      : await generateText({
+          model,
+          system: systemPrompt,
+          messages,
+          providerOptions,
+          tools,
+          stopWhen: [stepCountIs(MAX_TOOL_STEPS_SUBORDINATE), hasToolCall("response")],
+          temperature: settings.chatModel.temperature ?? 0.7,
+          maxOutputTokens: settings.chatModel.maxTokens ?? 4096,
+        });
     return text;
   } finally {
     if (mcpCleanupSub) {

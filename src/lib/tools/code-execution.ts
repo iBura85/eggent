@@ -438,7 +438,7 @@ function prepareExecution(params: {
     command: shell,
     args: ["-lc", wrapped],
     cwd: terminalState.cwd || params.cwd,
-    env: buildTerminalEnv(shell),
+    env: buildTerminalEnv(shell, terminalState.cwd || params.cwd),
     commandPreview: previewText(params.code),
     terminalMarker: marker,
     terminalState,
@@ -916,11 +916,15 @@ function rewriteAptCommandsWithSudo(code: string): string {
   return ['echo "[eggent] Auto-added sudo for apt/apt-get command(s)"', ...rewritten].join("\n");
 }
 
-function buildTerminalEnv(shell: string): NodeJS.ProcessEnv {
+function buildTerminalEnv(shell: string, cwd: string): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     PYTHONUNBUFFERED: "1",
   };
+
+  // Make app-local and workspace-local CLI bins available to terminal tasks.
+  env.PATH = mergePath(path.join(process.cwd(), "node_modules", ".bin"), env.PATH);
+  env.PATH = mergePath(path.join(cwd, "node_modules", ".bin"), env.PATH);
 
   const loginShellPath = getLoginShellPath(shell);
   if (loginShellPath) {

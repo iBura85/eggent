@@ -55,7 +55,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const visibleTextContent = textContent || responseToolText;
 
   return (
-    <div className="space-y-1">
+    <div className="min-w-0 space-y-1">
       {/* Tool invocations */}
       {toolParts.map((part, idx) => {
         if (part.type === "dynamic-tool") {
@@ -124,7 +124,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 
       {/* Text content: same font size for user and AI, first line aligned with icon center */}
       {visibleTextContent && (
-        <div className="flex gap-3 py-2 items-start">
+        <div className="flex min-w-0 items-start gap-3 py-2">
           <div
             className={`flex size-8 shrink-0 items-center justify-center rounded-full ${
               isUser
@@ -138,11 +138,11 @@ export function MessageBubble({ message }: MessageBubbleProps) {
               <Bot className="size-4" />
             )}
           </div>
-          <div className="flex-1 min-w-0 text-sm leading-7 pt-0.5">
+          <div className="min-w-0 flex-1 pt-0.5 text-sm leading-7">
             {isUser ? (
-              <p className="whitespace-pre-wrap">{visibleTextContent}</p>
+              <p className="whitespace-pre-wrap break-words">{visibleTextContent}</p>
             ) : (
-              <div className="prose prose-sm dark:prose-invert max-w-none text-inherit [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+              <div className="prose prose-sm dark:prose-invert max-w-none min-w-0 overflow-x-hidden text-inherit [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
                 <MarkdownContent content={visibleTextContent} />
               </div>
             )}

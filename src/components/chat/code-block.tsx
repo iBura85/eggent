@@ -21,7 +21,7 @@ export function CodeBlock({ code, language }: CodeBlockProps) {
   };
 
   return (
-    <div className="relative group rounded-lg border bg-muted/50 overflow-hidden my-2">
+    <div className="group relative my-2 min-w-0 overflow-hidden rounded-lg border bg-muted/50">
       <div className="flex items-center justify-between px-3 py-1.5 border-b bg-muted/80">
         <span className="text-xs text-muted-foreground font-mono">
           {language || "code"}
@@ -45,7 +45,7 @@ export function CodeBlock({ code, language }: CodeBlockProps) {
           )}
         </Button>
       </div>
-      <pre className="p-3 overflow-x-auto text-sm">
+      <pre className="max-w-full overflow-x-auto p-3 text-sm">
         <code className={language ? `language-${language}` : ""}>
           {code}
         </code>

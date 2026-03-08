@@ -11,17 +11,36 @@ interface ChatMessagesProps {
 }
 
 export function ChatMessages({ messages, isLoading }: ChatMessagesProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const shouldStickToBottomRef = useRef(true);
 
-  // Auto-scroll on new messages
+  // Auto-scroll while the user stays near the bottom.
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (!shouldStickToBottomRef.current) return;
+    endRef.current?.scrollIntoView({ behavior: messages.length > 0 ? "smooth" : "auto" });
   }, [messages, isLoading]);
+
+  useEffect(() => {
+    shouldStickToBottomRef.current = true;
+  }, [messages[0]?.id]);
+
+  const handleScroll = () => {
+    const element = scrollRef.current;
+    if (!element) return;
+    const distanceFromBottom =
+      element.scrollHeight - element.scrollTop - element.clientHeight;
+    shouldStickToBottomRef.current = distanceFromBottom < 80;
+  };
 
   if (messages.length === 0 && !isLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center p-8">
-        <div className="text-center space-y-3 max-w-md">
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex flex-1 min-h-0 min-w-0 items-center justify-center overflow-y-auto overflow-x-hidden px-4 md:px-6"
+      >
+        <div className="max-w-md space-y-3 py-8 text-center">
           <div className="flex justify-center">
             <div className="size-16 rounded-2xl bg-primary/10 flex items-center justify-center">
               <svg
@@ -50,8 +69,12 @@ export function ChatMessages({ messages, isLoading }: ChatMessagesProps) {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 md:px-6">
-      <div className="max-w-3xl mx-auto py-4 space-y-1">
+    <div
+      ref={scrollRef}
+      onScroll={handleScroll}
+      className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden px-4 md:px-6"
+    >
+      <div className="mx-auto min-w-0 max-w-3xl space-y-1 py-4">
         {messages.map((message) => (
           <MessageBubble key={message.id} message={message} />
         ))}
@@ -69,7 +92,7 @@ export function ChatMessages({ messages, isLoading }: ChatMessagesProps) {
           </div>
         )}
 
-        <div ref={endRef} />
+        <div ref={endRef} className="h-px" />
       </div>
     </div>
   );

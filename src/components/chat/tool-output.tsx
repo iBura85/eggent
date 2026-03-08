@@ -79,10 +79,10 @@ export function ToolOutput({ toolName, args, result }: ToolOutputProps) {
   if (toolName === "response") return null;
 
   return (
-    <div className="border rounded-lg my-2 overflow-hidden bg-card">
+    <div className="my-2 min-w-0 overflow-hidden rounded-lg border bg-card">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-2 w-full px-3 py-2 text-sm text-left hover:bg-muted/50 transition-colors"
+        className="flex w-full min-w-0 items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted/50"
       >
         {expanded ? (
           <ChevronDown className="size-4 shrink-0" />
@@ -90,7 +90,7 @@ export function ToolOutput({ toolName, args, result }: ToolOutputProps) {
           <ChevronRight className="size-4 shrink-0" />
         )}
         <Icon className="size-4 shrink-0 text-primary" />
-        <span className="font-medium">{label}</span>
+        <span className="min-w-0 truncate font-medium">{label}</span>
         {toolName === "code_execution" && args.runtime ? (
           <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
             {String(args.runtime)}
@@ -104,7 +104,7 @@ export function ToolOutput({ toolName, args, result }: ToolOutputProps) {
       </button>
 
       {expanded && (
-        <div className="border-t px-3 py-2 space-y-2">
+        <div className="space-y-2 border-t px-3 py-2 min-w-0">
           {/* Tool arguments */}
           {toolName === "code_execution" && args.code ? (
             <CodeBlock
@@ -121,11 +121,11 @@ export function ToolOutput({ toolName, args, result }: ToolOutputProps) {
 
           {/* Tool result */}
           {result ? (
-            <div className="text-sm">
+            <div className="min-w-0 text-sm">
               <p className="text-xs text-muted-foreground mb-1 font-medium">
                 Output:
               </p>
-              <pre className="text-xs bg-muted/50 rounded p-2 overflow-x-auto whitespace-pre-wrap max-h-64 overflow-y-auto">
+              <pre className="max-h-64 overflow-x-auto overflow-y-auto rounded bg-muted/50 p-2 text-xs whitespace-pre-wrap break-words">
                 {result}
               </pre>
             </div>

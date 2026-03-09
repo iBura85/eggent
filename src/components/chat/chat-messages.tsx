@@ -38,11 +38,11 @@ export function ChatMessages({ messages, isLoading }: ChatMessagesProps) {
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="flex flex-1 min-h-0 min-w-0 items-center justify-center overflow-y-auto overflow-x-hidden px-4 md:px-6"
+        className="chat-scrollbar flex flex-1 min-h-0 min-w-0 items-center justify-center overflow-y-auto overflow-x-hidden px-5 py-8 md:px-8"
       >
-        <div className="max-w-md space-y-3 py-8 text-center">
+        <div className="max-w-xl space-y-4 py-8 text-center">
           <div className="flex justify-center">
-            <div className="size-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+            <div className="flex size-16 items-center justify-center rounded-[1.75rem] border border-white/10 bg-white/5 text-primary shadow-[0_20px_60px_rgba(0,0,0,0.18)]">
               <svg
                 className="size-8 text-primary"
                 fill="none"
@@ -58,8 +58,8 @@ export function ChatMessages({ messages, isLoading }: ChatMessagesProps) {
               </svg>
             </div>
           </div>
-          <h3 className="text-lg font-semibold">Start a conversation</h3>
-          <p className="text-sm text-muted-foreground">
+          <h3 className="text-xl font-semibold tracking-tight">Start a conversation</h3>
+          <p className="text-sm leading-7 text-muted-foreground md:text-[15px]">
             Send a message to begin chatting with the AI agent. It can execute
             code, search the web, manage memory, and more.
           </p>
@@ -72,22 +72,20 @@ export function ChatMessages({ messages, isLoading }: ChatMessagesProps) {
     <div
       ref={scrollRef}
       onScroll={handleScroll}
-      className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden px-4 md:px-6"
+      className="chat-scrollbar flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden px-5 pb-8 pt-8 md:px-8 md:pt-10"
     >
-      <div className="mx-auto min-w-0 max-w-3xl space-y-1 py-4">
+      <div className="mx-auto min-w-0 w-full max-w-[54rem] space-y-8 pb-6">
         {messages.map((message) => (
           <MessageBubble key={message.id} message={message} />
         ))}
 
         {isLoading && messages.length > 0 && (
-          <div className="flex gap-3 py-3">
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-              <Loader2 className="size-4 animate-spin" />
+          <div className="mx-auto flex w-full max-w-[48rem] items-center gap-3 py-1 text-muted-foreground">
+            <div className="flex size-7 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-primary">
+              <Loader2 className="size-3.5 animate-spin" />
             </div>
-            <div className="flex items-center">
-              <span className="text-sm text-muted-foreground">
-                Thinking...
-              </span>
+            <div className="text-sm">
+              <span>Thinking...</span>
             </div>
           </div>
         )}

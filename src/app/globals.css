@@ -8,6 +8,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-reading: var(--font-editorial);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -45,6 +46,9 @@
 
 :root {
   --radius: 0.625rem;
+  --font-editorial: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  --chat-reading-foreground: oklch(0.3 0.01 70);
+  --chat-reading-muted: oklch(0.45 0.01 70);
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -79,6 +83,8 @@
 }
 
 .dark {
+  --chat-reading-foreground: oklch(0.9 0.01 80);
+  --chat-reading-muted: oklch(0.74 0.01 80);
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
@@ -128,6 +134,45 @@
 }
 
 @layer utilities {
+  .chat-reading-surface {
+    background: oklch(0.145 0.004 70);
+  }
+
+  .composer-textarea {
+    scrollbar-width: none;
+  }
+
+  .composer-textarea::-webkit-scrollbar {
+    display: none;
+  }
+
+  @media (min-width: 768px) {
+    .chat-scrollbar {
+      scrollbar-width: thin;
+      scrollbar-color: oklch(0.42 0.01 75 / 0.7) transparent;
+    }
+
+    .chat-scrollbar::-webkit-scrollbar {
+      width: 10px;
+    }
+
+    .chat-scrollbar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .chat-scrollbar::-webkit-scrollbar-thumb {
+      border: 2px solid transparent;
+      border-radius: 9999px;
+      background: oklch(0.42 0.01 75 / 0.58);
+      background-clip: padding-box;
+    }
+
+    .chat-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: oklch(0.5 0.012 75 / 0.72);
+      background-clip: padding-box;
+    }
+  }
+
   .pb-safe {
     padding-bottom: calc(1rem + env(safe-area-inset-bottom));
   }

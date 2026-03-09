@@ -326,7 +326,7 @@ export function ChatInput({
                 disabled={disabled}
                 rows={1}
                 enterKeyHint={isMobile ? "enter" : "send"}
-                className="min-h-[30px] max-h-[200px] w-full min-w-0 translate-y-px resize-none border-0 bg-transparent px-1 pt-2.5 pb-1.5 text-base leading-6 placeholder:text-muted-foreground focus:outline-none disabled:opacity-50 sm:text-sm sm:leading-5"
+                className="composer-textarea min-h-[30px] max-h-[200px] w-full min-w-0 translate-y-px resize-none border-0 bg-transparent px-1 pt-2.5 pb-1.5 text-base leading-6 placeholder:text-muted-foreground focus:outline-none disabled:opacity-50 sm:text-sm sm:leading-5"
               />
             </div>
 

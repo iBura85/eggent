@@ -79,10 +79,10 @@ export function ToolOutput({ toolName, args, result }: ToolOutputProps) {
   if (toolName === "response") return null;
 
   return (
-    <div className="my-2 min-w-0 overflow-hidden rounded-lg border bg-card">
+    <div className="min-w-0 overflow-hidden rounded-2xl border border-white/7 bg-white/[0.04] text-[var(--chat-reading-foreground)] shadow-[0_16px_36px_rgba(0,0,0,0.12)] backdrop-blur-sm">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex w-full min-w-0 items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted/50"
+        className="flex w-full min-w-0 items-center gap-2 px-4 py-3 text-left text-sm transition-colors hover:bg-white/[0.04]"
       >
         {expanded ? (
           <ChevronDown className="size-4 shrink-0" />
@@ -92,19 +92,19 @@ export function ToolOutput({ toolName, args, result }: ToolOutputProps) {
         <Icon className="size-4 shrink-0 text-primary" />
         <span className="min-w-0 truncate font-medium">{label}</span>
         {toolName === "code_execution" && args.runtime ? (
-          <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+          <span className="rounded-full border border-white/10 bg-white/[0.05] px-2 py-0.5 text-[11px] text-muted-foreground">
             {String(args.runtime)}
           </span>
         ) : null}
         {toolName === "search_web" && args.query ? (
-          <span className="text-xs text-muted-foreground truncate">
+          <span className="truncate text-xs text-[var(--chat-reading-muted)]">
             &quot;{String(args.query)}&quot;
           </span>
         ) : null}
       </button>
 
       {expanded && (
-        <div className="space-y-2 border-t px-3 py-2 min-w-0">
+        <div className="min-w-0 space-y-2 border-t border-white/8 px-4 py-3">
           {/* Tool arguments */}
           {toolName === "code_execution" && args.code ? (
             <CodeBlock
@@ -122,10 +122,10 @@ export function ToolOutput({ toolName, args, result }: ToolOutputProps) {
           {/* Tool result */}
           {result ? (
             <div className="min-w-0 text-sm">
-              <p className="text-xs text-muted-foreground mb-1 font-medium">
+              <p className="mb-1 text-xs font-medium uppercase tracking-[0.08em] text-[var(--chat-reading-muted)]">
                 Output:
               </p>
-              <pre className="max-h-64 overflow-x-auto overflow-y-auto rounded bg-muted/50 p-2 text-xs whitespace-pre-wrap break-words">
+              <pre className="max-h-64 overflow-x-auto overflow-y-auto rounded-xl border border-white/8 bg-black/[0.2] p-3 text-xs whitespace-pre-wrap break-words">
                 {result}
               </pre>
             </div>

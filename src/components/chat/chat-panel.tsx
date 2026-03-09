@@ -472,16 +472,18 @@ export function ChatPanel() {
   ]);
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
-      <ChatMessages messages={messages} isLoading={isLoading} />
-      <ChatInput
-        input={input}
-        setInput={setInput}
-        onSubmit={onSubmit}
-        onStop={stop}
-        isLoading={isLoading}
-        chatId={activeChatId || internalChatId}
-      />
+    <div className="chat-reading-surface flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+      <div className="mx-auto flex h-full w-full max-w-6xl min-w-0 flex-col overflow-hidden">
+        <ChatMessages messages={messages} isLoading={isLoading} />
+        <ChatInput
+          input={input}
+          setInput={setInput}
+          onSubmit={onSubmit}
+          onStop={stop}
+          isLoading={isLoading}
+          chatId={activeChatId || internalChatId}
+        />
+      </div>
     </div>
   );
 }
